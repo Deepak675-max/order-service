@@ -1,0 +1,63 @@
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: 'CART_QUEUE is not defined',
+  timestamp: '2024-04-03 00:03:35'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:06:20'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:07:11'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:09:10'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:09:41'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:10:01'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:13:00'
+}
+{
+  status: undefined,
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: "Cannot read properties of undefined (reading 'items')",
+  timestamp: '2024-04-03 00:16:03'
+}
+{
+  status: '404',
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: 'Your cart is empty',
+  timestamp: '2024-04-03 09:52:31'
+}
