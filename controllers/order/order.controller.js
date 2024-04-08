@@ -121,11 +121,8 @@ const getOrders = async (req, res, next) => {
             where: {}
         };
 
-        if (querySchema.category) {
-            queryDetails.where.category = querySchema.category;
-        }
-        if (querySchema.available) {
-            queryDetails.where.available = querySchema.available;
+        if (querySchema.status) {
+            queryDetails.where.status = querySchema.status;
         }
 
         queryDetails.where.customerId = req.payloadData.userId;
