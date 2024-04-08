@@ -1,0 +1,7 @@
+{
+  status: '404',
+  path: '\\controllers\\order\\order.controller.js',
+  level: 'error',
+  message: 'Your cart is empty',
+  timestamp: '2024-04-07 13:18:55'
+}

@@ -38,8 +38,8 @@ const orderSchema = new mongoose.Schema({
     amount: { type: Number },
     status: {
         type: String,
-        enum: ["pending", "shipped", "confirmed", "canceled"],
-        default: "pending"
+        enum: ["initiated", "shipped", "confirmed", "canceled"],
+        default: "initiated"
     },
     shippingAddress: {
         type: shippingAddressSchema,
@@ -51,7 +51,7 @@ const orderSchema = new mongoose.Schema({
                 _id: { type: mongoose.Schema.Types.ObjectId, require: true },
                 name: { type: String },
                 description: { type: String },
-                image: { type: String },
+                thumbnailImage: { type: String },
                 category: { type: String },
                 unit: { type: Number },
                 price: { type: Number },

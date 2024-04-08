@@ -13,5 +13,9 @@ module.exports = {
     DEFAULT_SORT_ORDER: process.env.DEFAULT_SORT_ORDER,
     CART_QUEUE: "cart_queue",
     ORDER_QUEUE: "order_queue",
-    PRODUCT_QUEUE: "product_queue"
+    PRODUCT_QUEUE: "product_queue",
+    NOTIFICATION_QUEUE: "notification_queue",
+    PRODUCT_SERVICE_BASE_URL: process.env.PRODUCT_SERVICE_BASE_URL,
+    CART_SERVICE_BASE_URL: process.env.CART_SERVICE_BASE_URL,
+    USER_SERVICE_BASE_URL: process.env.USER_SERVICE_BASE_URL
 };

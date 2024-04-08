@@ -11,7 +11,11 @@ orderServiceRouter.post('/create-order',
     orderController.createOrder
 );
 
-orderServiceRouter.post('/get-user-order',
+orderServiceRouter.post('/get-orders',
+    authMiddleware.authenticateUser,
+    orderController.getOrders
+);
+orderServiceRouter.get('/get-order-details/:id',
     authMiddleware.authenticateUser,
     orderController.getOrderDetails
 );

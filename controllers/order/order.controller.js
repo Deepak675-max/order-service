@@ -2,50 +2,13 @@ const httpErrors = require("http-errors");
 const joiOrder = require("../../utils/joi/order/order.joi_validation");
 const OrderModel = require("../../models/order/order.model");
 const { logger } = require("../../utils/error_logger/winston");
-const { connectToMessageBroker, consumeMessage } = require("../../utils/message_broker/rabbitmq");
+const Queue = require("../../utils/message_broker/rabbitmq");
 const { v4: uuidv4 } = require('uuid');
-const { CART_QUEUE, ORDER_QUEUE, PRODUCT_QUEUE } = require("../../config/index")
+const amqplib = require("amqplib");
+const { CART_QUEUE, PRODUCT_QUEUE, NOTIFICATION_QUEUE, CART_SERVICE_BASE_URL, JWT_ACCESS_TOKEN_HEADER, USER_SERVICE_BASE_URL, DEFAULT_LIMIT, DEFAULT_OFFSET, DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } = require("../../config/index")
+const { makeAxiosGetRequest, make } = require("../../utils/common/index");
 
 const OrderService = require("../../services/order/order.service");
-
-const getCartDataFromCartService = async (userId) => {
-    const { channel, connection } = await connectToMessageBroker();
-
-    channel.sendToQueue(CART_QUEUE, Buffer.from(JSON.stringify({ userId, event: "GET_CART", service: "Order" })));
-
-    return new Promise(async (resolve, reject) => {
-        // Listen for response from cart service
-        channel.consume(ORDER_QUEUE, (msg) => {
-            const cartData = JSON.parse(msg.content.toString());
-            console.log('Received cart items:', cartData);
-            resolve(cartData);
-        }, { noAck: true });
-
-        setTimeout(() => {
-            connection.close();
-        }, 500);
-    });
-}
-
-async function deleteCartItems(userId) {
-    const { channel, connection } = await connectToMessageBroker();
-
-    channel.sendToQueue(CART_QUEUE, Buffer.from(JSON.stringify({ userId, event: "DELETE_CART_ITEMS", service: "Order" })));
-
-    setTimeout(() => {
-        connection.close()
-    }, 500);
-}
-
-async function updateProductsInventory(items) {
-    const { channel, connection } = await connectToMessageBroker();
-
-    channel.sendToQueue(PRODUCT_QUEUE, Buffer.from(JSON.stringify({ items: items, event: "UPDATE_PRODUCTS_INVENTORY", service: "Order" })));
-
-    setTimeout(() => {
-        connection.close()
-    }, 500);
-}
 
 const orderService = new OrderService();
 
@@ -57,13 +20,25 @@ const orderService = new OrderService();
 //     return subTotal;
 // }
 
+const constructNotification = (user, type, message) => {
+    return {
+        user: user,
+        type: type,
+        message: message
+    }
+}
+
 const createOrder = async (req, res, next) => {
     try {
         const userInput = await joiOrder.createOrderSchema.validateAsync(req.body);
 
-        const { cart, subTotal } = await getCartDataFromCartService(req.payloadData.userId);
+        // const { cart, subTotal } = await getCartDataFromCartService(req.payloadData.userId);
+        const headers = {
+            Cookie: `access-token=${req.cookies[JWT_ACCESS_TOKEN_HEADER]}`
+        }
 
-        // const subTotal = getCartItemsSubTotal(cart.items);
+        const { cart, subTotal } = await makeAxiosGetRequest(`${CART_SERVICE_BASE_URL}/api/get-cart`, headers)
+
         if (subTotal == 0) throw httpErrors.NotFound("Your cart is empty");
 
         const orderDetails = {
@@ -76,9 +51,18 @@ const createOrder = async (req, res, next) => {
 
         const newOrder = await orderService.createOrder(orderDetails);
 
-        await updateProductsInventory(cart.items);
+        Queue.sendDateToQueue(PRODUCT_QUEUE, cart.items, "UPDATE_PRODUCTS_INVENTORY");
 
-        await deleteCartItems(req.payloadData.userId)
+        Queue.sendDateToQueue(CART_QUEUE, req.payloadData.userId, "DELETE_CART_ITEMS");
+
+        const { userProfile } = await makeAxiosGetRequest(`${USER_SERVICE_BASE_URL}/api/profile/${req.payloadData.userId}`, headers)
+
+        console.log(userProfile);
+
+        const notification = constructNotification({ userId: userProfile._id, email: userProfile.email }, "order notification", `your order successfully placed and your Order ID: ${newOrder.orderId}`);
+
+        // await sendNotification(notification);
+        Queue.sendDateToQueue(NOTIFICATION_QUEUE, notification, "SEND_NOTIFICATION");
 
         if (res.headersSent === false) {
             res.status(201).send({
@@ -100,103 +84,60 @@ const createOrder = async (req, res, next) => {
 
 const getOrderDetails = async (req, res, next) => {
     try {
-        const orderDetails = await joiOrder.getUserOrderDetailsSchema.validateAsync(req.body);
+        const { id: orderId } = await joiOrder.getOrderDetailsSchema.validateAsync(req.params);
 
-        const order = (await OrderModel.findOne(
-            {
-                where: {
-                    userId: orderDetails.userId,
-                    isDeleted: false
-                },
-                attributes: {
-                    exclude: ["createdAt", "updatedAt", "isDeleted"]
-                },
-                include: [
-                    {
-                        model: ProductModel,
-                        attributes: ["productName", "id"],
-                        through: {
-                            attributes: ["productTotalPrice", "productQuantity", "productSize", "productColor"]
-                        }
-                    }
-                ]
-            }
-        )).get();
-
-        console.log(order.Products);
-
-        const orderItems = await Promise.all(
-
-            order.Products.map(async (product) => {
-
-                const productColor = await ColorModel.findOne({
-                    where: {
-                        id: product.OrderItems.productColor,
-                        isDeleted: false
-                    },
-                    attributes: ["name"]
-                })
-
-                const productFile = await FileModel.findOne({
-                    where: {
-                        productId: product.id,
-                        isDeleted: false,
-                        originalname: {
-                            [Op.iLike]: `%${productColor.name}%`
-                        },
-                    },
-                    attributes: ["filename"]
-                });
-
-
-                return {
-                    productId: product.id,
-                    productName: product.productName,
-                    productColor: productColor.name,
-                    productQuantity: product.OrderItems.productQuantity,
-                    productTotalPrice: product.OrderItems.productTotalPrice,
-                    productSize: product.OrderItems.productSize,
-                    productImageURL: `${process.env.APP_BACKEND_BASE_URL}/files/${productFile.filename}`
-                }
-
-            })
-
-        )
-
-        delete order.Products;
-
-        order.Products = orderItems;
-
-        order.shippingAddress = await AddressModel.findOne({
-            where: {
-                id: order.shippingAddressId,
-                isDeleted: false,
-            },
-            attributes: {
-                exclude: ["isDeleted", "createdAt", "updatedAt"]
-            }
-        });
-
-        order.billingAddress = await AddressModel.findOne({
-            where: {
-                id: order.billingAddressId,
-                isDeleted: false,
-            },
-            attributes: {
-                exclude: ["isDeleted", "createdAt", "updatedAt"]
-            }
-        });
-
-        delete order.shippingAddressId;
-
-        delete order.billingAddressId;
+        const orderDetails = await orderService.getOrderDetails(orderId);
 
         if (res.headersSent === false) {
             res.status(200).send({
                 error: false,
                 data: {
-                    order: order,
+                    orderDetails: orderDetails,
                     message: "Order is fetched successfully",
+                },
+            });
+        }
+
+    } catch (error) {
+        console.log(error);
+        if (error?.isJoi === true) error.status = 422;
+        logger.error(error.message, { status: error.status, path: __filename });
+        next(error);
+    }
+}
+
+const getOrders = async (req, res, next) => {
+    try {
+        const querySchema = await joiOrder.getOrdersSchema.validateAsync(req.body);
+        const page = querySchema.metaData?.offset || DEFAULT_OFFSET;
+        const pageSize = querySchema.metaData?.limit || DEFAULT_LIMIT;
+        const sort = {};
+        sort[DEFAULT_SORT_BY] = DEFAULT_SORT_ORDER;
+
+        const queryDetails = {
+            skip: (page - 1) * pageSize,
+            limit: pageSize,
+            sort: sort,
+            where: {}
+        };
+
+        if (querySchema.category) {
+            queryDetails.where.category = querySchema.category;
+        }
+        if (querySchema.available) {
+            queryDetails.where.available = querySchema.available;
+        }
+
+        queryDetails.where.customerId = req.payloadData.userId;
+
+        const orders = await orderService.getOrders(queryDetails);
+
+        if (res.headersSent === false) {
+            res.status(200).send({
+                error: false,
+                data: {
+                    orders: orders,
+                    message: "Orders is fetched successfully",
                 },
             });
         }
@@ -211,18 +152,9 @@ const getOrderDetails = async (req, res, next) => {
 
 const cancelOrder = async (req, res, next) => {
     try {
-        const orderDetails = await joiOrder.cancelOrderSchema.validateAsync(req.body);
+        const { orderId } = await joiOrder.cancelOrderSchema.validateAsync(req.body);
 
-        const order = await OrderModel.findOne({
-            where: {
-                id: orderDetails.orderId,
-                isDeleted: false
-            }
-        });
-
-        order.status = "Canceled";
-
-        await order.save();
+        await orderService.cancelOrder(orderId)
 
         if (res.headersSent === false) {
             res.status(200).send({
@@ -245,5 +177,6 @@ const cancelOrder = async (req, res, next) => {
 module.exports = {
     createOrder,
     getOrderDetails,
+    getOrders,
     cancelOrder
 }

@@ -13,12 +13,17 @@ class OrderService {
         }
     }
 
-    async getOrders(userId) {
+    async getOrders(queryDetails) {
         try {
-            const orders = await OrderModel.find({
-                customerId: userId,
-                isDeleted: false
-            });
+            const { where, skip, pageSize, sort } = queryDetails;
+            const orders = await OrderModel
+                .find(where)
+                .skip(skip)
+                .limit(pageSize)
+                .sort(sort)
+                .select("-isDeleted -createdAt -updatedAt")
+                .lean()
+
             return orders;
         } catch (error) {
             throw error;
@@ -28,7 +33,7 @@ class OrderService {
     async getOrderDetails(orderId) {
         try {
             const order = await OrderModel.findOne({
-                orderId: orderId,
+                _id: orderId,
                 isDeleted: false
             });
             if (!order) throw httpErrors.NotFound('Order not found');
@@ -51,10 +56,6 @@ class OrderService {
         } catch (error) {
             throw error;
         }
-    }
-
-    async SubscribeEvents(payload) {
-        // describe events here.
     }
 }
 

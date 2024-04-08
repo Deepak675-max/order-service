@@ -13,7 +13,7 @@ const createOrderSchema = joi.object({
     isDeleted: joi.boolean().optional().default(false),
 });
 
-const getOrders = joi.object({
+const getOrdersSchema = joi.object({
     status: joi.string().trim().optional().default(null),
     metaData: joi.object({
         orderBy: joi.string().trim().optional().default(null),
@@ -23,18 +23,18 @@ const getOrders = joi.object({
     }).optional().default(null)
 })
 
-const getUserOrderDetailsSchema = joi.object({
-    userId: joi.number().integer().required(),
+const getOrderDetailsSchema = joi.object({
+    id: joi.string().trim().hex().length(24).required(),
 })
 
 const cancelOrderSchema = joi.object({
-    orderId: joi.number().integer().required(),
+    orderId: joi.string().trim().hex().length(24).required(),
 });
 
 module.exports = {
     createOrderSchema,
-    getOrders,
-    getUserOrderDetailsSchema,
+    getOrdersSchema,
+    getOrderDetailsSchema,
     cancelOrderSchema,
 
 };

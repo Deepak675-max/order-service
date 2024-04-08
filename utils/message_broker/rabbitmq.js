@@ -1,31 +1,34 @@
 const amqplib = require("amqplib");
-const { ORDER_QUEUE } = require("../../config/index");
+const { ORDER_QUEUE, CART_QUEUE, PRODUCT_QUEUE } = require("../../config/index");
 const OrderService = require("../../services/order/order.service");
+const { logger } = require("../error_logger/winston");
+
+let channel, connection;
 
 const connectToMessageBroker = async () => {
-    const connection = await amqplib.connect('amqp://localhost');
-    const channel = await connection.createChannel();
-    await channel.assertQueue(ORDER_QUEUE);
-    return { channel, connection };
+    try {
+        connection = await amqplib.connect('amqp://localhost');
+        channel = await connection.createChannel();
+        await channel.assertQueue(ORDER_QUEUE);
+    } catch (error) {
+        console.log(error);
+        logger.error(error.message, { status: error.status, path: __filename });
+        throw error;
+    }
 }
 
-const consumeMessage = (channel, connection) => {
-    return new Promise((resolve, reject) => {
-        channel.consume(ORDER_QUEUE, async (msg) => {
-            const payload = JSON.parse(msg.content.toString());
-            const orderServiceInstance = new OrderService();
-            // Retrieve data based on event
-            const serviceResponse = await orderServiceInstance.SubscribeEvents(payload);
-            // Send service Response
-            if (payload.service == "Cart")
-                channel.sendToQueue(CART_QUEUE, Buffer.from(JSON.stringify(serviceResponse)));
-            if (payload.service == "Product")
-                channel.sendToQueue(PRODUCT_QUEUE, Buffer.from(JSON.stringify(serviceResponse)));
-        }, { noAck: true });
-    });
+const sendDateToQueue = async (queueName, data, event) => {
+    try {
+        channel.sendToQueue(queueName, Buffer.from(JSON.stringify({ data, event })));
+    } catch (error) {
+        console.log(error);
+        logger.error(error.message, { status: error.status, path: __filename });
+        throw error;
+    }
 }
+
 
 module.exports = {
     connectToMessageBroker,
-    consumeMessage,
+    sendDateToQueue,
 };

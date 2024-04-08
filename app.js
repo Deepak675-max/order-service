@@ -20,6 +20,7 @@ orderServiceBackendApp.use(express.urlencoded({ extended: true }));
 orderServiceBackendApp.use(express.static(path.join(__dirname, 'public')));
 
 const orderServiceRoutes = require("./routes/order/order.route");
+const { connectToMessageBroker } = require('./utils/message_broker/rabbitmq');
 orderServiceBackendApp.use("/api", orderServiceRoutes);
 
 orderServiceBackendApp.use(async (req, _res, next) => {
@@ -45,8 +46,9 @@ orderServiceBackendApp.use((error, req, res, next) => {
 
 const port = APP_PORT;
 
-server.listen(port, () => {
+server.listen(port, async () => {
     console.log("Order Service is running on the port " + port)
+    await connectToMessageBroker();
 })
 
 
